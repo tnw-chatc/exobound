@@ -5,6 +5,18 @@ Custom Integrator Module for REBOUND
 import rebound
 import numpy as np
 
+# ========
+
+default_configs = {
+    'planet_num': 4,
+    'planet_mass': [1e-5, 1e-5, 1e-5, 1e-5],
+    'kappa': 2.000180,
+    'rho': 1,
+    'C': [0.5, 0.5],
+}
+
+# ========
+
 
 def integrate_one_cycle(sim, target_mean_anomaly=16*np.pi, init_time_step=0.005):
     """
@@ -87,3 +99,55 @@ def bisection_sin_M(sim, target, a, b, tol=1e-9, doom_counts=50):
     return half
 
 
+def init_simulation(theta, configs=default_configs):
+    """
+    Initializes a simulation object. The system's config needs to determined in `configs`.
+    """
+    # Initialize the system
+    planet_num = configs['planet_num']
+    if planet_num <= 1:
+        raise Exception("The integrator requires more than one planet.")
+        
+    planet_mass = configs['planet_mass']
+    rho = configs['rho']
+    C = configs['C']
+    kappa = configs['kappa']
+
+    # Parse theta params
+    init_e = theta[:planet_num] # The first n-th elements of theta are init eccentricities
+    init_M = theta[planet_num:2 * planet_num - 1] # The next (n-1)-th elements of theta are init mean anomalies
+    init_pomega = theta[2 * planet_num - 1:3 * planet_num - 2] # The next (n-1)-th elements are init pomega
+    
+    if planet_num > 2:
+        init_X = theta[3 * planet_num - 2:] # Extra parameter
+
+    # Semi-major axis defined in the paper
+    sma = np.zeros(planet_num)
+    sma[0] = rho * 1
+    sma[1] = sma[0] * (kappa ** (2/3))
+
+    if planet_num > 2:
+        period_ratio_nom = np.zeros(planet_num-2)
+        period_ratio_nom[0] = kappa
+        for i in range(1, len(period_ratio_nom)):
+            # Recursively define period_ratio_nom
+            period_ratio_nom[i] = (1+C[i]*(1-period_ratio_nom[i-1]))**(-1)
+    else:
+        period_ratio_nom = None
+
+    for i in range(2, planet_num):
+        sma[i] = sma[i-1] * (init_X[i-2] + period_ratio_nom[i-2])**(2/3)
+
+    
+    # Initialize the simulation
+    sim = rebound.Simulation()
+    sim.add(m=1) # Primary star
+    sim.add(m=planet_mass[0], a=sma[0], e=init_e[0], pomega=init_pomega[0]) # The innermost planet
+
+    # The other planets
+    for i in range(1, planet_num):
+        sim.add(m=planet_mass[i], a=sma[i], e=init_e[i], pomega=init_pomega[i-1])
+    sim.move_to_com()    
+
+    return sim, theta, configs
+    
