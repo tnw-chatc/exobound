@@ -64,7 +64,7 @@ def integrate_one_cycle(sim, target_mean_anomaly=16*np.pi, init_time_step=0.005)
 
 def bisection_sin_M(sim, target, a, b, tol=1e-9, doom_counts=50):
     """
-    Bisection method on sin M. The function terminates after the 50th unsuccessful attempt.
+    Bisection method on sin M. The function terminates after a certain attempt.
     """
     doom = 0
     while (doom <= doom_counts):
@@ -127,13 +127,14 @@ def init_simulation(theta, configs=default_configs):
     sma[1] = sma[0] * (kappa ** (2/3))
 
     if planet_num > 2:
+        # The index 0 corresponds to the 3rd (2) planet
         period_ratio_nom = np.zeros(planet_num-2)
         period_ratio_nom[0] = kappa
         for i in range(1, len(period_ratio_nom)):
             # Recursively define period_ratio_nom
             period_ratio_nom[i] = (1+C[i]*(1-period_ratio_nom[i-1]))**(-1)
     else:
-        period_ratio_nom = None
+        period_ratio_nom = []
 
     for i in range(2, planet_num):
         sma[i] = sma[i-1] * (init_X[i-2] + period_ratio_nom[i-2])**(2/3)
@@ -149,5 +150,66 @@ def init_simulation(theta, configs=default_configs):
         sim.add(m=planet_mass[i], a=sma[i], e=init_e[i], pomega=init_pomega[i-1])
     sim.move_to_com()    
 
-    return sim, theta, configs
+    return sim, theta, configs, period_ratio_nom
     
+
+def optimizing_function(theta, configs):
+    """
+    Calculates the square of errors (as defined in the merit function)
+    """
+    sim, theta, configs, period_ratio_nom = init_simulation(theta, configs)
+    planet_num = configs['planet_num']
+
+    # Parse theta params
+    init_e = theta[:planet_num] # The first n-th elements of theta are init eccentricities
+    init_M = theta[planet_num:2 * planet_num - 1] # The next (n-1)-th elements of theta are init mean anomalies
+    init_pomega = theta[2 * planet_num - 1:3 * planet_num - 2] # The next (n-1)-th elements are init pomega
+    
+    if planet_num > 2:
+        init_X = theta[3 * planet_num - 2:] # Extra parameters
+
+    # Integrate
+    integrate_one_cycle(sim)
+    sim.move_to_com()
+
+    # Store the final parameters. The order must be consistent with `theta`
+    # Calculate diff as it goes
+    final_params = []
+
+    # Eccentricity
+    e_diff = np.zeros(len(init_e))
+    for i in range(len(init_e)):
+        final_e = sim.particles[i+1].e
+        final_params.append(final_e)
+        e_diff[i] = final_e - init_e[i]
+    
+    # Mean anomaly
+    M_diff = np.zeros(len(init_M))
+    for i in range(1, len(init_M)):
+        final_M = sim.particles[i+1].M
+        final_params.append(final_M)
+        M_diff[i-1] = final_M - init_M[i-1]
+
+    # Longitude of Periastron
+    final_pomega = np.zeros(len(init_pomega))
+    for i in range(1, len(init_pomega)):
+        final_pomega[i-1] = sim.particles[i+1].pomega
+        # final_params.append(sim.particles[i+1].pomega)
+    
+    pomega_diff = np.zeros(len(final_pomega)-1)
+    for j in range(1, len(pomega_diff)):
+        pomega_diff[j] = final_pomega[j] - final_pomega[j-1]
+
+    # X
+    if planet_num > 2:
+        X_diff = np.zeros(len(init_X))
+        for i in range(0, len(init_X)):
+            X_diff[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
+            # final_params.append(sim.particle[i+3].a ** (3/2) / sim.particle[i+2].a ** (3/2) - period_ratio_nom[i])
+
+    diff = np.concatenate((e_diff, M_diff, pomega_diff, X_diff)).flatten()
+
+    merit_fn = np.sum([d**2 for d in diff])
+
+    return merit_fn
+
