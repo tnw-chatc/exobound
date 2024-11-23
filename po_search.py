@@ -56,7 +56,7 @@ def randomize_init_params(planet_num, rand_bounds=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n_trials', default=10, type=int, help="Number of trials")
-    parser.add_argument('-s', '--save_path', default='results/results.npy', type=str, help="Saved results directory")
+    parser.add_argument('-s', '--save_path', default='results.npy', type=str, help="Saved results directory")
     parser.add_argument('--overwrite', action='store_true', help="Overwrite the existing results")
     args = vars(parser.parse_args())
     
@@ -65,7 +65,12 @@ if __name__ == "__main__":
     init_param = np.zeros(n_trials, dtype='object')
     results = np.zeros(n_trials, dtype='object')
 
-    save_path = args['save_path']
+    save_path = 'results/'
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    save_path += args['save_path']
 
     if os.path.exists(save_path):
         if not args['overwrite']:
