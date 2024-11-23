@@ -216,3 +216,33 @@ def optimizing_function(theta, configs):
 
     return merit_fn
 
+
+def calculate_mse(theta, configs):
+    """
+    Calculate mean square error of the given system after one cycle
+    """
+    sim, theta, configs, period_ratio_nom = init_simulation(theta, configs)
+    planet_num = configs['planet_num']
+
+    sim.move_to_com()
+    cart_init = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
+
+    # print(cart_init)
+    
+    integrate_one_cycle(sim)
+    sim.move_to_com()
+    
+    cart_final = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
+
+    # print(cart_final)
+
+    cart_diff = cart_final - cart_init
+
+    # print(cart_diff)
+
+    mse = np.zeros(planet_num)
+    for i, pos in enumerate(cart_diff):
+        mse[i] = np.sum([comp ** 2 for comp in pos])
+
+    return mse
+
