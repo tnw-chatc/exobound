@@ -117,6 +117,8 @@ def init_simulation(theta, configs=default_configs):
     init_e = theta[:planet_num] # The first n-th elements of theta are init eccentricities
     init_M = theta[planet_num:2 * planet_num - 1] # The next (n-1)-th elements of theta are init mean anomalies
     init_pomega = theta[2 * planet_num - 1:3 * planet_num - 2] # The next (n-1)-th elements are init pomega
+
+    # print(init_pomega)
     
     if planet_num > 2:
         init_X = theta[3 * planet_num - 2:] # Extra parameter
@@ -132,7 +134,7 @@ def init_simulation(theta, configs=default_configs):
         period_ratio_nom[0] = kappa
         for i in range(1, len(period_ratio_nom)):
             # Recursively define period_ratio_nom
-            period_ratio_nom[i] = (1+C[i]*(1-period_ratio_nom[i-1]))**(-1)
+            period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
     else:
         period_ratio_nom = []
 
@@ -143,11 +145,11 @@ def init_simulation(theta, configs=default_configs):
     # Initialize the simulation
     sim = rebound.Simulation()
     sim.add(m=1) # Primary star
-    sim.add(m=planet_mass[0], a=sma[0], e=init_e[0], pomega=init_pomega[0]) # The innermost planet
+    sim.add(m=planet_mass[0], a=sma[0], e=init_e[0], M=0, pomega=0) # The innermost planet
 
     # The other planets
     for i in range(1, planet_num):
-        sim.add(m=planet_mass[i], a=sma[i], e=init_e[i], pomega=init_pomega[i-1])
+        sim.add(m=planet_mass[i], a=sma[i], e=init_e[i], M=init_M[i-1], pomega=init_pomega[i-1])
     sim.move_to_com()    
 
     return sim, theta, configs, period_ratio_nom
@@ -160,13 +162,21 @@ def optimizing_function(theta, configs):
     sim, theta, configs, period_ratio_nom = init_simulation(theta, configs)
     planet_num = configs['planet_num']
 
-    # Parse theta params
-    init_e = theta[:planet_num] # The first n-th elements of theta are init eccentricities
-    init_M = theta[planet_num:2 * planet_num - 1] # The next (n-1)-th elements of theta are init mean anomalies
-    init_pomega = theta[2 * planet_num - 1:3 * planet_num - 2] # The next (n-1)-th elements are init pomega
-    
+    init_e = np.array([sim.particles[i+1].e for i in range(planet_num)])
+    init_M = np.array([sim.particles[i+1].M for i in range(planet_num)])
+    init_pomega = np.array([sim.particles[i+1].pomega for i in range(planet_num)])
+
+
     if planet_num > 2:
-        init_X = theta[3 * planet_num - 2:] # Extra parameters
+        init_X = np.zeros(planet_num - 2)
+        for i in range(0, len(init_X)):
+            init_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
+
+    # print(init_e)
+    # print(init_M)
+    # print(init_pomega)
+    # print(init_X)
+    # print()
 
     # Integrate
     integrate_one_cycle(sim)
@@ -174,40 +184,33 @@ def optimizing_function(theta, configs):
 
     # Store the final parameters. The order must be consistent with `theta`
     # Calculate diff as it goes
-    final_params = []
+    final_e = np.array([sim.particles[i+1].e for i in range(planet_num)])
+    final_M = np.array([sim.particles[i+1].M for i in range(planet_num)])
+    final_pomega = np.array([sim.particles[i+1].pomega for i in range(planet_num)])
 
-    # Eccentricity
-    e_diff = np.zeros(len(init_e))
-    for i in range(len(init_e)):
-        final_e = sim.particles[i+1].e
-        final_params.append(final_e)
-        e_diff[i] = final_e - init_e[i]
-    
-    # Mean anomaly
-    M_diff = np.zeros(len(init_M))
-    for i in range(1, len(init_M)):
-        final_M = sim.particles[i+1].M
-        final_params.append(final_M)
-        M_diff[i-1] = final_M - init_M[i-1]
-
-    # Longitude of Periastron
-    final_pomega = np.zeros(len(init_pomega))
-    for i in range(1, len(init_pomega)):
-        final_pomega[i-1] = sim.particles[i+1].pomega
-        # final_params.append(sim.particles[i+1].pomega)
-    
-    pomega_diff = np.zeros(len(final_pomega)-1)
-    for j in range(1, len(pomega_diff)):
-        pomega_diff[j] = final_pomega[j] - final_pomega[j-1]
-
-    # X
     if planet_num > 2:
-        X_diff = np.zeros(len(init_X))
+        final_X = np.zeros(len(init_X))
         for i in range(0, len(init_X)):
-            X_diff[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
-            # final_params.append(sim.particle[i+3].a ** (3/2) / sim.particle[i+2].a ** (3/2) - period_ratio_nom[i])
+            final_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
 
-    diff = np.concatenate((e_diff, M_diff, pomega_diff, X_diff)).flatten()
+    e_diff = final_e - init_e
+    M_diff = final_M - init_M
+    X_diff = final_X - init_X
+
+    pomega_diff = np.array([(final_pomega[i] - final_pomega[i+1]) - (init_pomega[i] - init_pomega[i+1]) for i in range(len(init_M) - 1)])
+    
+    # print(final_e)
+    # print(final_M)
+    # print(final_pomega)
+    # print(final_X)
+    # print()
+
+    # print(e_diff)
+    # print(M_diff)
+    # print(pomega_diff)
+    # print(X_diff)
+
+    diff = np.concatenate((e_diff, M_diff[1:], pomega_diff, X_diff)).flatten()
 
     merit_fn = np.sum([d**2 for d in diff])
 
