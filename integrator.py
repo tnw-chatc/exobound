@@ -126,21 +126,19 @@ def init_simulation(theta, configs=default_configs):
     # Semi-major axis defined in the paper
     sma = np.zeros(planet_num)
     sma[0] = rho * 1
-    sma[1] = sma[0] * (kappa ** (2/3))
 
-    if planet_num > 2:
-        # The index 0 corresponds to the 3rd (2) planet
-        period_ratio_nom = np.zeros(planet_num-2)
-        period_ratio_nom[0] = kappa
-        for i in range(1, len(period_ratio_nom)):
-            # Recursively define period_ratio_nom
-            period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
-    else:
-        period_ratio_nom = []
+    # The index 0 corresponds to the 2nd (1) planet
+    period_ratio_nom = np.zeros(planet_num-1)
+    period_ratio_nom[0] = kappa
+    
+    sma[1] = sma[0] * (period_ratio_nom[0] ** (2/3))
+
+    for i in range(1, len(period_ratio_nom)):
+        # Recursively define period_ratio_nom
+        period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
 
     for i in range(2, planet_num):
-        sma[i] = sma[i-1] * (init_X[i-2] + period_ratio_nom[i-2])**(2/3)
-
+        sma[i] = sma[i-1] * (init_X[i-2] + period_ratio_nom[i-1])**(2/3)
     
     # Initialize the simulation
     sim = rebound.Simulation()
