@@ -52,19 +52,6 @@ def randomize_init_params(planet_num, rand_bounds=None):
     return np.concatenate((e_guess, M_guess, pomega_guess, X_guess)).flatten()
 
 
-def wrap_angle(angles):
-    for i, ang in enumerate(angles):
-        while np.abs(ang) > 2 * np.pi:
-            if ang < 0:
-                ang += 2*np.pi
-            if ang > 0:
-                ang -= 2*np.pi
-
-        angles[i] = ang
-
-    return angles
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n_trials', default=10, type=int, help="Number of trials")

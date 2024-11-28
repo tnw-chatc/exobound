@@ -99,6 +99,19 @@ def bisection_sin_M(sim, target, a, b, tol=1e-9, doom_counts=50):
     return half
 
 
+def wrap_angle(angles):
+    for i, ang in enumerate(angles):
+        while np.abs(ang) > 2 * np.pi:
+            if ang < 0:
+                ang += 2*np.pi
+            if ang > 0:
+                ang -= 2*np.pi
+
+        angles[i] = ang
+
+    return angles
+
+
 def init_simulation(theta, configs=default_configs):
     """
     Initializes a simulation object. The system's config needs to determined in `configs`.
@@ -192,7 +205,7 @@ def optimizing_function(theta, configs):
             final_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
 
     e_diff = final_e - init_e
-    M_diff = final_M - init_M
+    M_diff = wrap_angle(final_M) - wrap_angle(init_M)
     X_diff = final_X - init_X
 
     pomega_diff = np.array([(final_pomega[i] - final_pomega[i+1]) - (init_pomega[i] - init_pomega[i+1]) for i in range(len(init_M) - 1)])
