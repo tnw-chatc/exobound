@@ -13,18 +13,23 @@ default_configs = {
     'kappa': 2.000180,
     'rho': 1,
     'C': [0.5, 0.5],
+    'target_mean_anomaly': 16*np.pi,
+    'init_time_step': 0.005,
+    'bisection_tol': 1e-9,
 }
 
 # ========
 
 
-def integrate_one_cycle(sim, target_mean_anomaly=16*np.pi, init_time_step=0.005):
+def integrate_one_cycle(sim, configs):
     """
     Integrates to the target mean anomaly. Uses Bisection Method on sin M to find the target time. Cannot be used for circular orbit (needs to use `l` instead of `M`)
 
     Returns sim object
     """
-    time_step = init_time_step 
+    time_step = configs['init_time_step']
+    target_mean_anomaly = configs['target_mean_anomaly']
+    bisection_tol = configs['bisection_tol']
     current_mean_anomaly = 0
     N_peri = 0
     counter = 0
@@ -56,16 +61,16 @@ def integrate_one_cycle(sim, target_mean_anomaly=16*np.pi, init_time_step=0.005)
 
         # Find the precise 16pi
         if current_mean_anomaly > target_mean_anomaly:
-            target_time = bisection_sin_M(sim, target_mean_anomaly, times[-2], times[-1])
+            target_time = bisection_sin_M(sim, target_mean_anomaly, times[-2], times[-1], bisection_tol)
             sim.integrate(target_time)
             return sim
             # return M, times, target_time
 
 
-def bisection_sin_M(sim, target, a, b, tol=1e-9, doom_counts=50):
+def bisection_sin_M(sim, target, a, b, tol=1e-9, doom_counts=100):
     """
     Bisection method on sin M. The function terminates after a certain attempt.
-    """
+    """    
     doom = 0
     while (doom <= doom_counts):
         half = (a + b)/2
@@ -190,7 +195,7 @@ def optimizing_function(theta, configs):
     # print()
 
     # Integrate
-    integrate_one_cycle(sim)
+    integrate_one_cycle(sim, configs)
     sim.move_to_com()
 
     # Store the final parameters. The order must be consistent with `theta`
@@ -238,18 +243,22 @@ def calculate_mse(theta, configs):
     sim.move_to_com()
     cart_init = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
 
-    # print(cart_init)
+    print(cart_init)
+    print()
     
-    integrate_one_cycle(sim)
+    
+    integrate_one_cycle(sim, configs)
     sim.move_to_com()
     
     cart_final = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
 
-    # print(cart_final)
+    print(cart_final)
+    print()
 
     cart_diff = cart_final - cart_init
 
-    # print(cart_diff)
+    print(cart_diff)
+    print()
 
     mse = np.zeros(planet_num)
     for i, pos in enumerate(cart_diff):
