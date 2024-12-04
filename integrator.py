@@ -63,7 +63,7 @@ def integrate_one_cycle(sim, configs):
         if current_mean_anomaly > target_mean_anomaly:
             target_time = bisection_sin_M(sim, target_mean_anomaly, times[-2], times[-1], bisection_tol)
             sim.integrate(target_time)
-            return sim
+            return sim, target_time
             # return M, times, target_time
 
 
