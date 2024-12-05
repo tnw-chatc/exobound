@@ -10,7 +10,6 @@ import copy
 from scipy.optimize import minimize, root
 
 from integrator import *
-# from po_search import *
 
 
 def primary_optimize(init_theta, configs, tol=1e-8, method='lm', options={}):
@@ -21,11 +20,13 @@ def primary_optimize(init_theta, configs, tol=1e-8, method='lm', options={}):
     
     # The results is in "unbound" format. Needs to be converted
     results = root(optimizing_function_vector, x0=init_theta, args=(configs,), tol=tol, method=method, options=options)
-
+    print(results)
+    print()
     # Convert to usable format
     usable_results = copy.copy(results.x)
     usable_results[:planet_num] = sigmoid(usable_results[:planet_num])
     usable_results[-(planet_num-2):] = sigmoid_X(usable_results[-(planet_num-2):])
+    print(usable_results)
     
     mse = calculate_mse(usable_results, configs)
 
@@ -59,28 +60,7 @@ def periodic_orbit_search(init_theta, configs, bounds, cutoff=1e-1, tol_1=1e-8, 
         results_2, configs, mse, res_fun = secondary_optimize(results_1, configs, bounds=bounds, tol=tol_2, method=method_2, options=options_2)  
         print('Secondary search done!')
 
-        print(results.x)
+        print(results_2)
 
-        return results.x, configs, mse, res_fun
-    
+        return results_2, configs, mse, res_fun
 
-
-    
-# def periodic_orbit_search(init_theta, configs, bounds, tol=1e-8, verbose=False, method='L-BFGS-B', options={}):
-#     """
-#     Search for the best fitting parameter.
-#     """
-#     if verbose:
-#         print(f'Current Theta: {init_theta}')
-        
-#     results = minimize(optimizing_function, *(init_theta, configs), bounds=bounds, tol=tol, method=method, options=options)
-#     mse = calculate_mse(results.x, configs)
-
-#     if verbose:
-#         print(f'Searching done!')
-#         print(f'mse: {mse}')
-#         print(f'Average mse: {np.mean(mse)}')
-#         print(f'Results: ')
-#         print(results)
-        
-#     return results.x, configs, mse, results.fun
