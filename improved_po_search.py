@@ -12,6 +12,8 @@ from scipy.optimize import minimize, root
 from integrator import *
 from po_search import randomize_init_params
 
+np.random.seed(422)
+
 
 def primary_optimize(init_theta, configs, tol=1e-8, method='lm', options={}):
     """
@@ -21,7 +23,7 @@ def primary_optimize(init_theta, configs, tol=1e-8, method='lm', options={}):
     
     # The results is in "unbound" format. Needs to be converted
     results = root(optimizing_function_vector, x0=init_theta, args=(configs,), tol=tol, method=method, options=options)
-    print(results)
+    # print(results)
     print()
     # Convert to usable format
     usable_results = copy.copy(results.x)
@@ -30,6 +32,7 @@ def primary_optimize(init_theta, configs, tol=1e-8, method='lm', options={}):
     print(usable_results)
     
     mse = calculate_mse(usable_results, configs)
+    print(np.sqrt(np.mean(mse)))
 
     return usable_results, configs, mse, results.fun
     
@@ -44,7 +47,7 @@ def secondary_optimize(init_theta, configs, bounds, tol=1e-8, verbose=False, met
     return results.x, configs, mse, results.fun
 
 
-def periodic_orbit_search(init_theta, configs, bounds, cutoff=1e-1, tol_1=1e-8, tol_2=1e-8, verbose=False, method_1='lm', method_2='Nelder-Mead', options_1={}, options_2={}):
+def periodic_orbit_search(init_theta, configs, bounds, cutoff=1, tol_1=1e-8, tol_2=1e-8, verbose=False, method_1='lm', method_2='Nelder-Mead', options_1={}, options_2={}):
     """
     Quickly search using the primary algorithm. If it seems feasible, try the secondary algorithm which will take much longer.
     """
@@ -110,17 +113,21 @@ if __name__ == '__main__':
         print(f'Running... [{i+1}/{n_trials}]')
         while True:
             try:
-                init_param[i] = randomize_init_params(4, [(-10, 0), (np.pi - 0.5, np.pi + 0.5), (0, 2*np.pi), (-10, 10)])
-                results[i] = periodic_orbit_search(init_param[i], init_configs, bounds, tol_1=1e-6, tol_2=1e-12,
-                      options_1={'ftol': 1e-3,
-                               'maxiter': 10000},
+                init_param[i] = randomize_init_params(4, [(-5, -0.5), (np.pi - 0.5, np.pi + 0.5), (0, 2*np.pi), (-5, 5)])
+                results[i] = periodic_orbit_search(init_param[i], init_configs, bounds, cutoff=1e-2, tol_1=1e-6, tol_2=1e-12,
+                      options_1={'ftol': 1e-9,
+                               'maxiter': 5000},
                       options_2={'adaptive': True,
-                              'maxiter': 10000,
-                              'maxfev': 10000})
+                              'maxiter': 5000,
+                              'maxfev': 5000})
                 # break if success
+                print('debug: 1st success')
                 break
             except ValueError as e:
-                print(f'Primary search is not feasible. Retrying...')
+                print(f'Primary search is not feasible (not converging). Retrying...')
+                continue
+            except TypeError as e:
+                print(f'Primary search is not feasible (complex). Retrying...')
                 continue
 
         print(f'Done! [{i+1}/{n_trials}]')
