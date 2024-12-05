@@ -12,14 +12,14 @@ from integrator import *
 
 # ========
 
-def periodic_orbit_search(init_theta, configs, bounds, tol=1e-8, verbose=False, method='L-BFGS-B'):
+def periodic_orbit_search(init_theta, configs, bounds, tol=1e-8, verbose=False, method='L-BFGS-B', options={}):
     """
     Search for the best fitting parameter.
     """
     if verbose:
         print(f'Current Theta: {init_theta}')
         
-    results = minimize(optimizing_function, *(init_theta, configs), bounds=bounds, tol=tol, method=method)
+    results = minimize(optimizing_function, *(init_theta, configs), bounds=bounds, tol=tol, method=method, options=options)
     mse = calculate_mse(results.x, configs)
 
     if verbose:

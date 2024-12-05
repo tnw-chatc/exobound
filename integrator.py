@@ -373,9 +373,7 @@ def optimizing_function_vector(theta, configs):
     # print(M_diff)
     # print(pomega_diff)
     # print(X_diff)
-
     
-
     diff = np.concatenate((e_diff, M_diff[1:], pomega_diff, X_diff)).flatten()
 
     return diff
@@ -391,22 +389,21 @@ def calculate_mse(theta, configs):
     sim.move_to_com()
     cart_init = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
 
-    print(cart_init)
-    print()
-    
+    # print(cart_init)
+    # print()
     
     integrate_one_cycle(sim, configs)
     sim.move_to_com()
     
     cart_final = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
 
-    print(cart_final)
-    print()
+    # print(cart_final)
+    # print()
 
     cart_diff = cart_final - cart_init
 
-    print(cart_diff)
-    print()
+    # print(cart_diff)
+    # print()
 
     mse = np.zeros(planet_num)
     for i, pos in enumerate(cart_diff):
