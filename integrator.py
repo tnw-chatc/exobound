@@ -55,6 +55,17 @@ def integrate_one_cycle(sim, configs):
     counter = 0
     M = [0]
     times = [sim.t]
+
+    # If target time override is parsed, return the integrated simulation object with such time
+    try:
+        overridden_target_time = configs['overridden_target_time']
+    except KeyError as e:
+        overridden_target_time = None
+
+    if overridden_target_time:
+        target_time = overridden_target_time
+        sim.integrate(overridden_target_time)
+        return sim, target_time
     
     while True:
         # Integrate by stepping one time
@@ -186,7 +197,8 @@ def init_simulation(theta, configs=default_configs):
     # The other planets
     for i in range(1, planet_num):
         sim.add(m=planet_mass[i], a=sma[i], e=init_e[i], M=init_M[i-1], pomega=init_pomega[i-1])
-    sim.move_to_com()    
+    # sim.move_to_com()    
+    sim.move_to_hel()    
 
     return sim, theta, configs, period_ratio_nom
 
@@ -269,11 +281,55 @@ def optimizing_function(theta, configs):
         for i in range(0, len(init_X)):
             init_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
 
-    # print(init_e)
-    # print(init_M)
-    # print(init_pomega)
-    # print(init_X)
-    # print()
+    # Integrate
+    integrate_one_cycle(sim, configs)
+    # sim.move_to_com()
+    sim.move_to_hel()
+
+    # Store the final parameters. The order must be consistent with `theta`
+    # Calculate diff as it goes
+    final_e = np.array([sim.particles[i+1].e for i in range(planet_num)])
+    final_M = np.array([sim.particles[i+1].M for i in range(planet_num)])
+    final_pomega = np.array([sim.particles[i+1].pomega for i in range(planet_num)])
+
+    if planet_num > 2:
+        final_X = np.zeros(len(init_X))
+        for i in range(0, len(init_X)):
+            final_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
+
+    e_diff = final_e - init_e
+    M_diff = wrap_angle(final_M) - wrap_angle(init_M)
+    X_diff = final_X - init_X
+
+    pomega_diff = np.array([(final_pomega[i] - final_pomega[i+1]) - (init_pomega[i] - init_pomega[i+1]) for i in range(len(init_M) - 1)])
+
+    diff = np.concatenate((e_diff, M_diff[1:], pomega_diff, X_diff)).flatten()
+
+    merit_fn = np.sum([d**2 for d in diff])
+
+    return merit_fn
+
+
+def optimizing_function_freetime(theta, configs):
+    """
+    Calculates the square of errors (as defined in the merit function); Includes target integration time as one of the variables
+    """
+    # Extracting the free target time from the last element of theta
+    configs['overridden_target_time'] = theta[-1]
+    theta = theta[:-1]
+    
+    sim, theta, configs, period_ratio_nom = init_simulation(theta, configs)
+    planet_num = configs['planet_num']
+
+    init_e = np.array([sim.particles[i+1].e for i in range(planet_num)])
+    init_M = np.array([sim.particles[i+1].M for i in range(planet_num)])
+    init_pomega = np.array([sim.particles[i+1].pomega for i in range(planet_num)])
+
+
+    if planet_num > 2:
+        init_X = np.zeros(planet_num - 2)
+        for i in range(0, len(init_X)):
+            init_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
 
     # Integrate
     integrate_one_cycle(sim, configs)
@@ -295,17 +351,6 @@ def optimizing_function(theta, configs):
     X_diff = final_X - init_X
 
     pomega_diff = np.array([(final_pomega[i] - final_pomega[i+1]) - (init_pomega[i] - init_pomega[i+1]) for i in range(len(init_M) - 1)])
-    
-    # print(final_e)
-    # print(final_M)
-    # print(final_pomega)
-    # print(final_X)
-    # print()
-
-    # print(e_diff)
-    # print(M_diff)
-    # print(pomega_diff)
-    # print(X_diff)
 
     diff = np.concatenate((e_diff, M_diff[1:], pomega_diff, X_diff)).flatten()
 
@@ -394,6 +439,39 @@ def calculate_mse(theta, configs):
     
     integrate_one_cycle(sim, configs)
     sim.move_to_com()
+    
+    cart_final = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
+
+    # print(cart_final)
+    # print()
+
+    cart_diff = cart_final - cart_init
+
+    # print(cart_diff)
+    # print()
+
+    mse = np.zeros(planet_num)
+    for i, pos in enumerate(cart_diff):
+        mse[i] = np.sum([comp ** 2 for comp in pos])
+
+    return mse
+
+
+def calculate_mse_hel(theta, configs):
+    """
+    Calculate mean square error of the given system after one cycle
+    """
+    sim, theta, configs, period_ratio_nom = init_simulation(theta, configs)
+    planet_num = configs['planet_num']
+
+    sim.move_to_hel()
+    cart_init = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
+
+    # print(cart_init)
+    # print()
+    
+    integrate_one_cycle(sim, configs)
+    sim.move_to_hel()
     
     cart_final = np.array([[sim.particles[i+1].x, sim.particles[i+1].y, sim.particles[i+1].z] for i in range(0, planet_num)])
 
