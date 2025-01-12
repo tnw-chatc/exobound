@@ -295,7 +295,10 @@ def optimizing_function(theta, configs):
     if planet_num > 2:
         final_X = np.zeros(len(init_X))
         for i in range(0, len(init_X)):
-            final_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i] 
+            try:
+                final_X[i] = sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i]
+            except:
+                final_X[i] = np.abs(sim.particles[i+3].a ** (3/2) / sim.particles[i+2].a ** (3/2) - period_ratio_nom[i])
 
     e_diff = final_e - init_e
     M_diff = wrap_angle(final_M) - wrap_angle(init_M)
