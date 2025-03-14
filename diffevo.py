@@ -53,12 +53,21 @@ if __name__ == "__main__":
               (0, 2*np.pi), (0, 2*np.pi), (0, 2*np.pi), 
               (0, 2*np.pi), (0, 2*np.pi), (0, 2*np.pi),
              (-.5, .5), (-.5, .5),]
+
+    # bounds = [(0, 0.5),(0, 0.5),(0, 0.5),(0, 0.5), 
+    #           (0, 2*np.pi), (0, 2*np.pi), (0, 2*np.pi), 
+    #           (np.pi - 0.5, np.pi + 0.5), (-0.5, 0.5), (np.pi - 1, np.pi + 1),
+    #          (-.5, .5), (-.5, .5),]
     
-    early_stopper = EarlyStopping(patience=args['patience'], save_freq=10)
+    early_stopper = EarlyStopping(patience=args['patience'], save_freq=5)
+
+    init_guess = np.array([ 4.75237226e-01,  3.60341866e-01,  9.06524351e-02,  1.16951517e-01,
+                    5.76930241e+00,  5.87863872e+00,  2.13495560e+00,  4.88337357e+00,
+                    4.96088783e+00,  1.74146812e+00, -4.02460909e-04, -7.03490064e-04])
     
     de_results = differential_evolution(optimizing_function, args=(default_configs,), bounds=bounds, 
                                         workers=args['n_core'], disp=True, callback=early_stopper,
-                                       popsize=100, mutation=(0.2, 1.8), recombination=0.1)
+                                       popsize=80, mutation=(0.2, 1.8), recombination=0.2, x0=init_guess)
 
     print(de_results)
     print()
