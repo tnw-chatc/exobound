@@ -150,6 +150,8 @@ def init_simulation(theta, configs):
 
 def optimizing_function(theta, configs):
     planet_num = configs['planet_num']
+    kappa = configs['kappa']
+    C = configs['C']
     
     init_theta = theta
     init_sim = init_simulation(init_theta, configs)
@@ -161,7 +163,22 @@ def optimizing_function(theta, configs):
     final_M = wrap_angles([final_sim.particles[i+1].M for i in range(1, planet_num)])
     final_pomega = wrap_angles([final_sim.particles[i].pomega - final_sim.particles[i+1].pomega for i in range(1, planet_num)])
 
-    final_theta = np.hstack([final_e, final_M, final_pomega])
+    # The index 0 corresponds to the 2nd (1) planet
+    period_ratio_nom = np.zeros(planet_num-1)
+    period_ratio_nom[0] = kappa
+
+    for i in range(1, planet_num - 1):
+       period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
+
+    # Final period ratio difference (prd), formerly known as X
+    if planet_num >= 3:
+        final_prd = np.zeros(planet_num - 2)
+        for i in range(0, planet_num - 2):
+            final_prd[i] = (final_sim.particles[i+3].P / final_sim.particles[i+2].P) - period_ratio_nom[i+1]
+    else:
+        final_prd = []
+
+    final_theta = np.hstack([final_e, final_M, final_pomega, final_prd])
     
     theta_diff = np.asarray(final_theta) - np.asarray(init_theta)
     # print(init_theta, final_theta)
