@@ -109,30 +109,60 @@ def wrap_angle(ang):
 
 def init_simulation(theta, configs):
     inner_period = configs['inner_period']
+    planet_num = configs['planet_num']
+    planet_mass = configs['planet_mass']
+    kappa = configs['kappa']
+    C = configs['C']
+
+    init_e = 10 ** np.array(theta[0:planet_num], dtype=np.float64)
+    init_M = np.concat([[0.], np.array(theta[planet_num:2*planet_num - 1])])
+
+    # Init pomega including the innermost planet
+    init_pomega = np.zeros(planet_num)
+    init_pomega[0] = 0
+    for i in range(1, planet_num):
+        init_pomega[i] = init_pomega[i-1] - theta[2*planet_num - 1 + (i - 1)]
+
+    # The index 0 corresponds to the 2nd (1) planet
+    period_ratio_nom = np.zeros(planet_num-1)
+    period_ratio_nom[0] = kappa
+
+    for i in range(1, planet_num - 1):
+       period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
+
+    period = np.zeros(planet_num)
+    period[0] = inner_period
     
-    init_e = 10 ** np.array(theta[0:2], dtype=np.float64)
-    init_M = theta[2]
-    init_pomega = -theta[3]
-    
+    for i in range(1, planet_num):
+        period[i] = period[i-1] * period_ratio_nom[i-1]
+
     sim = rebound.Simulation()
 
+    # Add the primary star and the innermost planet
     sim.add(m=1)
-    sim.add(m=configs['planet_mass'][0], P=inner_period, e=init_e[0])
-    sim.add(m=configs['planet_mass'][1], P=inner_period*configs['kappa'], pomega=init_pomega, M=init_M, e=init_e[1])
-    
+
+    # Add the planets
+    for i in range(0, planet_num):
+        sim.add(m=planet_mass[i], P=period[i], pomega=init_pomega[i], M=init_M[i], e=init_e[i])
+
     return sim
 
 
 def optimizing_function(theta, configs):
+    planet_num = configs['planet_num']
+    
     init_theta = theta
     init_sim = init_simulation(init_theta, configs)
 
     final_sim, target_time, _, _ = integrate_one_cycle(init_sim, configs)
     final_sim.move_to_hel()
     
+    final_e = np.log10(np.array([final_sim.particles[i+1].e for i in range(0, planet_num)]))
+    final_M = wrap_angles([final_sim.particles[i+1].M for i in range(1, planet_num)])
+    final_pomega = wrap_angles([final_sim.particles[i].pomega - final_sim.particles[i+1].pomega for i in range(1, planet_num)])
 
-    final_theta = np.log10(final_sim.particles[1].e), np.log10(final_sim.particles[2].e), wrap_angle(final_sim.particles[2].M), wrap_angle(final_sim.particles[1].pomega - final_sim.particles[2].pomega)
-
+    final_theta = np.hstack([final_e, final_M, final_pomega])
+    
     theta_diff = np.asarray(final_theta) - np.asarray(init_theta)
     # print(init_theta, final_theta)
     # print(theta_diff)
