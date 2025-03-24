@@ -113,6 +113,7 @@ def init_simulation(theta, configs):
     planet_mass = configs['planet_mass']
     kappa = configs['kappa']
     C = configs['C']
+    integrator = configs.get('integrator', 'ias15')
 
     init_e = 10 ** np.array(theta[0:planet_num], dtype=np.float64)
     init_M = np.concat([[0.], np.array(theta[planet_num:2*planet_num - 1])])
@@ -137,6 +138,7 @@ def init_simulation(theta, configs):
         period[i] = period[i-1] * period_ratio_nom[i-1]
 
     sim = rebound.Simulation()
+    
 
     # Add the primary star and the innermost planet
     sim.add(m=1)
@@ -148,13 +150,17 @@ def init_simulation(theta, configs):
     return sim
 
 
-def optimizing_function(theta, configs):
+def optimizing_function(theta, configs, disable_prd=False):
     planet_num = configs['planet_num']
     kappa = configs['kappa']
     C = configs['C']
+    integrator = configs.get('integrator', 'ias15')
+    N_active = configs.get('N_active', planet_num + 1)
     
     init_theta = theta
     init_sim = init_simulation(init_theta, configs)
+    init_sim.integrator = integrator
+    init_sim.N_active = N_active
 
     final_sim, target_time, _, _ = integrate_one_cycle(init_sim, configs)
     final_sim.move_to_hel()
@@ -171,7 +177,7 @@ def optimizing_function(theta, configs):
        period_ratio_nom[i] = (1+C[i-1]*(1-period_ratio_nom[i-1]))**(-1)
 
     # Final period ratio difference (prd), formerly known as X
-    if planet_num >= 3:
+    if planet_num >= 3 and not disable_prd:
         final_prd = np.zeros(planet_num - 2)
         for i in range(0, planet_num - 2):
             final_prd[i] = (final_sim.particles[i+3].P / final_sim.particles[i+2].P) - period_ratio_nom[i+1]
